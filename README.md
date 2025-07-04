@@ -9,6 +9,7 @@ Currently supported blocks:
   <li>LEAVE</li>
   <li>ADVANCE</li>
   <li>TRANSFER (immediate, probabilty and expression modes)</li>
+  <li>GATE</li>
   <li>TERMINATE</li>
   <li>DEBUG (will print a message)</li>
 </ul>
