@@ -20,7 +20,7 @@ protected:
 
     friend class SimBuilder;
 public:
-    virtual Block* advance(priority_t) = 0;
+    virtual Block* advance(Transaction&) = 0;
     Block(Simulation& s, Block* next);
 
     #ifndef NDEBUG
@@ -33,7 +33,7 @@ private:
     size_t q_index;
 public:
     QueueBlock(Simulation& s, Block* next, size_t q_index);
-    virtual Block* advance(priority_t = 0) override;
+    virtual Block* advance(Transaction&) override;
     virtual ~QueueBlock() {};
 
     #ifndef NDEBUG
@@ -46,7 +46,7 @@ private:
     size_t q_index;
 public:
     DepartBlock(Simulation& s, Block* next, size_t q_index);
-    virtual Block* advance(priority_t = 0) override;
+    virtual Block* advance(Transaction&) override;
     virtual ~DepartBlock() {};
 
     #ifndef NDEBUG
@@ -59,7 +59,7 @@ private:
     size_t storage_index;
 public:
     EnterBlock(Simulation& s, Block* next, size_t storage_index);
-    virtual Block* advance(priority_t = 0) override;
+    virtual Block* advance(Transaction&) override;
     virtual ~EnterBlock() {};
         
     #ifndef NDEBUG
@@ -72,7 +72,7 @@ private:
     size_t storage_index;
 public:
     LeaveBlock(Simulation& s, Block* next, size_t storage_index);
-    virtual Block* advance(priority_t = 0) override;
+    virtual Block* advance(Transaction&) override;
     virtual ~LeaveBlock() {};
         
     #ifndef NDEBUG
@@ -81,9 +81,13 @@ public:
 };
 
 class Simulation::GenBlock: public Block {
+private:
+    priority_t priority;
+    RandomGenerator rng;
+
 public:
-    GenBlock(Simulation& s, Block* next, size_t priority);
-    virtual Block* advance(priority_t = 0) override;
+    GenBlock(Simulation& s, Block* next, priority_t priority, RandomGenerator rng);
+    virtual Block* advance(Transaction&) override;
     virtual ~GenBlock() {};
         
     #ifndef NDEBUG
@@ -93,10 +97,10 @@ public:
 
 class Simulation::AdvanceBlock: public Block {
 private:
-    RandomGenerator gen;
+    RandomGenerator rng;
 public:
-    AdvanceBlock(Simulation& s, Block* next, RandomGenerator gen);
-    virtual Block* advance(priority_t pr) override;
+    AdvanceBlock(Simulation& s, Block* next, RandomGenerator rng);
+    virtual Block* advance(Transaction&) override;
     virtual ~AdvanceBlock() {};
         
     #ifndef NDEBUG
@@ -106,12 +110,12 @@ public:
 
 class Simulation::GateBlock: public Block {
 private:
-    priority_queue<priority_t> q;
+    priority_queue<Transaction> q;
     LogicNode expr;
 public:
     GateBlock(Simulation& s, Block* next, LogicNode expr);
     bool refresh();
-    virtual Block* advance(priority_t pr) override;
+    virtual Block* advance(Transaction&) override;
     virtual ~GateBlock() {};
         
     #ifndef NDEBUG
@@ -119,12 +123,14 @@ public:
     #endif
 };
 
+// index is used instead of Block* because at the point of usage needed label may be not declared.
+// All labels are resolved in the end of build. If used label is not resolved builder will throw an exception. No need to check at runtime
 class Simulation::TransferBlock_imm: public Block {
 private:
     size_t index;
 public:
     TransferBlock_imm(Simulation& s, Block* next, size_t index);
-    Block* advance(priority_t = 0) override;
+    Block* advance(Transaction&) override;
     virtual ~TransferBlock_imm() {};
         
     #ifndef NDEBUG
@@ -138,7 +144,7 @@ private:
     LogicNode expr;
 public:
     TransferBlock_expr(Simulation& s, Block* next, size_t alt_index, LogicNode expr);
-    Block* advance(priority_t = 0) override;
+    Block* advance(Transaction&) override;
     virtual ~TransferBlock_expr() {};
         
     #ifndef NDEBUG
@@ -154,7 +160,7 @@ private:
     static uniform_real_distribution<> dist; // by default returns value in [0; 1)
 public:
     TransferBlock_prob(Simulation& s, Block* next, size_t alt_index, double prob, int seed);
-    Block* advance(priority_t = 0) override;
+    Block* advance(Transaction&) override;
     virtual ~TransferBlock_prob() {};
         
     #ifndef NDEBUG
@@ -162,9 +168,23 @@ public:
     #endif
 };
 
+class Simulation::DebugBlock: public Block {
+private:
+    std::string debug_message;
+public:
+    virtual Block* advance(Transaction&) override;
+    DebugBlock(Simulation& s, Block* next, const string& debug_message);
+    virtual ~DebugBlock() {};
+        
+    #ifndef NDEBUG
+    virtual string name() override;
+    #endif
+};
+
+
 class Simulation::TerminateBlock: public Block {
 public:
-    virtual Block* advance(priority_t = 0) override;
+    virtual Block* advance(Transaction&) override;
     TerminateBlock(Simulation& sim);
     virtual ~TerminateBlock() {};
         
@@ -189,6 +209,6 @@ public:
     size_t get_current();
     size_t get_capacity();
 
-    bool enter(priority_t pr, EnterBlock* ptr); // true: some op accepted priority_t; false: there are no free ops
+    bool enter(const Transaction& transaction, EnterBlock* ret); // true: some op accepted priority_t; false: there are no free ops
     void leave();
 };

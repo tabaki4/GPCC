@@ -2,12 +2,16 @@
 #include <iostream>
 #include <iomanip>
 
-Simulation::SpawnData::SpawnData(priority_t pr, Block* block): pr(pr), block(block) {}
-bool Simulation::SpawnData::operator<(const SpawnData& rhs) const { return pr < rhs.pr; }
+Simulation::Transaction::Transaction(priority_t priority, uint64_t id, bool just_generated): priority(priority), id(id), just_generated(just_generated) {}
 
-Simulation::TimedSpawn::TimedSpawn(SpawnData& data, double time): data(data), time(time) {}
-Simulation::TimedSpawn::TimedSpawn(priority_t pr, Block* block, double time): data(pr, block), time(time) {}
-bool Simulation::TimedSpawn::operator<(const TimedSpawn& rhs) const { return time > rhs.time; }
+Simulation::SpawnData::SpawnData(const Transaction& transaction, Block* block): transaction(transaction), block(block) {}
+
+Simulation::TimedSpawn::TimedSpawn(const SpawnData& spawn_data, double time): spawn_data(spawn_data), time(time) {}
+
+bool Simulation::Transaction::operator<(const Transaction& rhs) const { return priority < rhs.priority; }
+bool Simulation::SpawnData::operator<(const SpawnData& rhs) const { return transaction < rhs.transaction; }
+bool Simulation::TimedSpawn::operator<(const TimedSpawn& rhs) const { return time > rhs.time ? true : time < rhs.time ? false : spawn_data < rhs.spawn_data; }
+
 
 
 bool Simulation::is_q_empty(size_t index) { return queues[index].data == 0; }
@@ -15,14 +19,15 @@ bool Simulation::is_storage_empty(size_t index) { return storages[index].data->e
 bool Simulation::is_storage_avail(size_t index) { return storages[index].data->available(); }
 bool Simulation::is_storage_full(size_t index) { return storages[index].data->full(); }
 
-void Simulation::serve(SpawnData& data) {
-    Block* current = data.block;
+void Simulation::serve(SpawnData& spawn_data) {
+    Transaction& transaction = spawn_data.transaction;
+    Block* current = spawn_data.block;
     while (current != nullptr) { 
             
         #ifndef NDEBUG
-        cout << "advancing from " << current->name() << '\n';
+        cout << "Transaction[" << transaction.id << "] advancing from " << current->name() << '\n';
         #endif
-        current = current->advance(data.pr);
+        current = current->advance(transaction);
     }
 
     #ifndef NDEBUG
@@ -103,7 +108,7 @@ void Simulation::launch() {
         save_stat(spawn.time - g_time);
 
         g_time = spawn.time;
-        serve(spawn.data);
+        serve(spawn.spawn_data);
 
         #ifndef NDEBUG
         cout << "entering refresh section\n";

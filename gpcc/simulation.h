@@ -17,6 +17,8 @@ public:
 private:
     typedef unsigned long priority_t;
 
+    uint64_t g_transaction_id = 0;
+
     class Block;
 
     struct  Stat {
@@ -38,21 +40,29 @@ private:
     template <typename U>
     NamedVar(const string&, U&&) -> NamedVar<decay_t<U>>;
 
-    struct SpawnData {
-        priority_t pr;
-        Block* block;
+    struct Transaction {
+        priority_t priority;
+        uint64_t id;
+        bool just_generated;
 
-        SpawnData(priority_t pr, Block* block);
-        bool operator<(const SpawnData& rhs) const;
+        Transaction(priority_t priority, uint64_t id, bool just_generateed = false);
+        bool operator<(const Transaction& rhs) const; // higher prioriry -> better
+    };
+
+    struct SpawnData {
+        Block* block;
+        Transaction transaction;
+
+        SpawnData(const Transaction& transaction, Block* block);
+        bool operator<(const SpawnData& rhs) const; // higher priority -> better
     };
 
     struct TimedSpawn {
-        SpawnData data;
+        SpawnData spawn_data;
         double time;
 
-        TimedSpawn(SpawnData& data, double time);
-        TimedSpawn(priority_t pr, Block* block, double time);
-        bool operator<(const TimedSpawn& rhs) const;
+        TimedSpawn(const SpawnData& data, double time);
+        bool operator<(const TimedSpawn& rhs) const; // 1. lower time -> better; 2. higher priority -> better
     };
 
     class FallThroughBlock;
@@ -66,6 +76,7 @@ private:
     class TransferBlock_imm;
     class TransferBlock_expr;
     class TransferBlock_prob;
+    class DebugBlock;
     class TerminateBlock;
     class Storage;
 
@@ -76,10 +87,10 @@ private:
     vector<NamedVar<size_t>> queues;
     vector<NamedVar<unique_ptr<Storage>>> storages;
     vector<GateBlock*> gates;
-    priority_queue<TimedSpawn> spawn_schedule;
-    queue<SpawnData> priority_spawn_schedule;
+    priority_queue<TimedSpawn> spawn_schedule; // spawn_shedule is the main schedule with time as priority parameter
+    queue<SpawnData> priority_spawn_schedule;  // priority_spawn_schedule is a special queue that holds tranasctions that just became able to move after being suspended (e.g. gate, enter etc.)
 
-    void serve(SpawnData& data);
+    void serve(SpawnData& data); // serves a transaction until it dies
     bool refresh_gates();
     void report();
 

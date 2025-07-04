@@ -6,7 +6,7 @@
 class SimBuilder {
 private:
     unique_ptr<Simulation> sim;
-    Simulation::Block* hold;
+    Simulation::Block* hold = nullptr;
     unordered_map<string, size_t> q_map;
     unordered_map<string, size_t> storage_map;
     unordered_map<string, size_t> label_map;
@@ -25,6 +25,7 @@ public:
     SimBuilder& add_transfer_expr(const string& alt_label, LogicNode expr);
     SimBuilder& add_transfer_prob(const string& alt_label, double prob, int seed = 1);
     SimBuilder& add_transfer_imm(const string& alt_label);
+    SimBuilder& add_debug(const string debug_msg);
     SimBuilder& add_terminate();
 
     LogicNode::func_t is_q_empty(const string& label);

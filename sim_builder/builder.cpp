@@ -81,23 +81,23 @@ SimBuilder& SimBuilder::add_leave(const string& label) {
     return *this;
 }
 
-SimBuilder& SimBuilder::add_generate(RandomGenerator gen, priority_t priority) {
-    auto block = make_unique<Simulation::GenBlock>(*sim, nullptr, priority);
-    if (hold != nullptr) hold->next = block.get();
+SimBuilder& SimBuilder::add_generate(RandomGenerator rng, priority_t priority) {
+    double first_time = rng();
+    auto block = make_unique<Simulation::GenBlock>(*sim, nullptr, priority, rng);
+    if (hold != nullptr) {
+        hold->next = block.get();
+    }
     hold = block.get();
 
-    double time = 0;
-    while ( time += gen(), time < sim->end_time ) { // populate spawn schedule with generated transactions // TODO: fix prepopulation with specian genblock semantics
-        sim->spawn_schedule.emplace(priority, block.get(), time);
-    }
+    sim->spawn_schedule.emplace(Simulation::SpawnData(Simulation::Transaction(priority, sim->g_transaction_id++, true), block.get()), first_time); 
 
     sim->blocks.emplace_back(move(block));
 
     return *this;
 }
 
-SimBuilder& SimBuilder::add_advance(RandomGenerator gen) {
-    auto block = make_unique<Simulation::AdvanceBlock>(*sim, nullptr, gen);
+SimBuilder& SimBuilder::add_advance(RandomGenerator rng) {
+    auto block = make_unique<Simulation::AdvanceBlock>(*sim, nullptr, rng);
     if (hold != nullptr) hold->next = block.get();
     hold = block.get();
     sim->blocks.emplace_back(move(block));
@@ -151,6 +151,17 @@ SimBuilder& SimBuilder::add_transfer_imm(const string& label) {
 
     auto block = make_unique<Simulation::TransferBlock_imm>(*sim, nullptr, label_map[label]);
     
+    if (hold != nullptr) hold->next = block.get();
+    hold = nullptr;
+
+    sim->blocks.emplace_back(move(block));
+
+    return *this;
+}
+
+SimBuilder& SimBuilder::add_debug(const string debug_msg) {
+    auto block = make_unique<Simulation::DebugBlock>(*sim, nullptr, debug_msg);
+
     if (hold != nullptr) hold->next = block.get();
     hold = nullptr;
 
