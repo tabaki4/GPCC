@@ -5,8 +5,8 @@
 
 class SimBuilder {
 private:
-    shared_ptr<Simulation> sim;
-    shared_ptr<Simulation::Block> hold;
+    unique_ptr<Simulation> sim;
+    Simulation::Block* hold;
     unordered_map<string, size_t> q_map;
     unordered_map<string, size_t> storage_map;
     unordered_map<string, size_t> label_map;
@@ -32,9 +32,9 @@ public:
     LogicNode::func_t is_storage_avail(const string& label);
     LogicNode::func_t is_storage_full(const string& label);
 
-    shared_ptr<Simulation> build();
+    unique_ptr<Simulation> build();
 
-    SimBuilder(double end_time): sim(make_shared<Simulation>()) { sim->end_time = end_time; }
+    SimBuilder(double end_time): sim(make_unique<Simulation>()) { sim->end_time = end_time; }
 };
 
 class SimBuilderException;

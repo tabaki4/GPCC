@@ -27,10 +27,10 @@ SimBuilder& SimBuilder::add_label(const string& label) {
 }
 
 SimBuilder& SimBuilder::add_storage(const string& label, size_t capacity) {
-
     if (storage_map.contains(label)) throw SimBuilderException(format("redeclaration of storage \"{}\"", label));
     storage_map[label] = sim->storages.size();
-    sim->storages.emplace_back(label, make_shared<Simulation::Storage>(*sim, capacity));
+    sim->storages.emplace_back(label, make_unique<Simulation::Storage>(*sim, capacity));
+
     return *this;
 }
 
@@ -40,9 +40,10 @@ SimBuilder& SimBuilder::add_queue(const string& label) {
         sim->queues.emplace_back(label, 0);
     }
 
-    auto res = make_shared<Simulation::QueueBlock>(*sim, nullptr, q_map[label]);
-    if (hold != nullptr) hold->next = res;
-    hold = res;
+    auto block = make_unique<Simulation::QueueBlock>(*sim, nullptr, q_map[label]);
+    if (hold != nullptr) hold->next = block.get();
+    hold = block.get();
+    sim->blocks.emplace_back(move(block));
 
     return *this;
 }
@@ -50,9 +51,10 @@ SimBuilder& SimBuilder::add_queue(const string& label) {
 SimBuilder& SimBuilder::add_depart(const string& label) {
     if (!q_map.contains(label)) throw SimBuilderException(format("depart from undeclared queue \"{}\"", label));
     
-    auto res = make_shared<Simulation::DepartBlock>(*sim, nullptr, q_map[label]);
-    if (hold != nullptr) hold->next = res;
-    hold = res;
+    auto block = make_unique<Simulation::DepartBlock>(*sim, nullptr, q_map[label]);
+    if (hold != nullptr) hold->next = block.get();
+    hold = block.get();
+    sim->blocks.emplace_back(move(block));
 
     return *this;
 }
@@ -60,9 +62,10 @@ SimBuilder& SimBuilder::add_depart(const string& label) {
 SimBuilder& SimBuilder::add_enter(const string& label) {
     if (!storage_map.contains(label)) throw SimBuilderException(format("enter to undeclared storage \"{}\"", label));
 
-    auto res = make_shared<Simulation::EnterBlock>(*sim, nullptr, storage_map[label]);
-    if (hold != nullptr) hold->next = res;
-    hold = res;
+    auto block = make_unique<Simulation::EnterBlock>(*sim, nullptr, storage_map[label]);
+    if (hold != nullptr) hold->next = block.get();
+    hold = block.get();
+    sim->blocks.emplace_back(move(block));
 
     return *this;
 }
@@ -70,40 +73,44 @@ SimBuilder& SimBuilder::add_enter(const string& label) {
 SimBuilder& SimBuilder::add_leave(const string& label) {
     if (!storage_map.contains(label)) throw SimBuilderException(format("leave from undeclared storage \"{}\"", label));
 
-    auto res = make_shared<Simulation::LeaveBlock>(*sim, nullptr, storage_map[label]);
-    if (hold != nullptr) hold->next = res;
-    hold = res;
+    auto block = make_unique<Simulation::LeaveBlock>(*sim, nullptr, storage_map[label]);
+    if (hold != nullptr) hold->next = block.get();
+    hold = block.get();
+    sim->blocks.emplace_back(move(block));
 
     return *this;
 }
 
 SimBuilder& SimBuilder::add_generate(RandomGenerator gen, priority_t priority) {
-    auto res = make_shared<Simulation::GenBlock>(*sim, nullptr, priority);
-    if (hold != nullptr) hold->next = res;
-    hold = res;
+    auto block = make_unique<Simulation::GenBlock>(*sim, nullptr, priority);
+    if (hold != nullptr) hold->next = block.get();
+    hold = block.get();
 
     double time = 0;
-    while ( time += gen(), time < sim->end_time ) { // populate spawn schedule with generated transactions
-        sim->spawn_schedule.emplace(priority, res, time);
+    while ( time += gen(), time < sim->end_time ) { // populate spawn schedule with generated transactions // TODO: fix prepopulation with specian genblock semantics
+        sim->spawn_schedule.emplace(priority, block.get(), time);
     }
+
+    sim->blocks.emplace_back(move(block));
 
     return *this;
 }
 
 SimBuilder& SimBuilder::add_advance(RandomGenerator gen) {
-    auto res = make_shared<Simulation::AdvanceBlock>(*sim, nullptr, gen);
-    if (hold != nullptr) hold->next = res;
-    hold = res;
+    auto block = make_unique<Simulation::AdvanceBlock>(*sim, nullptr, gen);
+    if (hold != nullptr) hold->next = block.get();
+    hold = block.get();
+    sim->blocks.emplace_back(move(block));
 
     return *this;
 }
 
 SimBuilder& SimBuilder::add_gate(LogicNode expr) {
-    auto res = make_shared<Simulation::GateBlock>(*sim, nullptr, move(expr));
-    if (hold != nullptr) hold->next = res;
-    hold = res;
-
-    sim->gates.push_back(res);
+    auto block = make_unique<Simulation::GateBlock>(*sim, nullptr, move(expr));
+    if (hold != nullptr) hold->next = block.get();
+    hold = block.get();
+    sim->gates.push_back(block.get());
+    sim->blocks.emplace_back(move(block));
 
     return *this;
 }
@@ -114,9 +121,10 @@ SimBuilder& SimBuilder::add_transfer_expr(const string& alt_label, LogicNode exp
         sim->labels.emplace_back(alt_label, nullptr);
     }
 
-    auto res = make_shared<Simulation::TransferBlock_expr>(*sim, nullptr, label_map[alt_label], move(expr));
-    if (hold != nullptr) hold->next = res;
-    hold = res;
+    auto block = make_unique<Simulation::TransferBlock_expr>(*sim, nullptr, label_map[alt_label], move(expr));
+    if (hold != nullptr) hold->next = block.get();
+    hold = block.get();
+    sim->blocks.emplace_back(move(block));
 
     return *this;
 }
@@ -127,9 +135,10 @@ SimBuilder& SimBuilder::add_transfer_prob(const string& alt_label, double prob, 
         sim->labels.emplace_back(alt_label, nullptr);
     }
     
-    auto res = make_shared<Simulation::TransferBlock_prob>(*sim, nullptr, label_map[alt_label], prob, seed);
-    if (hold != nullptr) hold->next = res;
-    hold = res;
+    auto block = make_unique<Simulation::TransferBlock_prob>(*sim, nullptr, label_map[alt_label], prob, seed);
+    if (hold != nullptr) hold->next = block.get();
+    hold = block.get();
+    sim->blocks.emplace_back(move(block));
 
     return *this;
 }
@@ -139,45 +148,58 @@ SimBuilder& SimBuilder::add_transfer_imm(const string& label) {
         label_map[label] = sim->labels.size();
         sim->labels.emplace_back(label, nullptr);
     }
+
+    auto block = make_unique<Simulation::TransferBlock_imm>(*sim, nullptr, label_map[label]);
     
-    if (hold != nullptr) hold->next = make_shared<Simulation::TransferBlock_imm>(*sim, nullptr, label_map[label]);
+    if (hold != nullptr) hold->next = block.get();
     hold = nullptr;
+
+    sim->blocks.emplace_back(move(block));
 
     return *this;
 }
 
 SimBuilder& SimBuilder::add_terminate() {
-    if (hold != nullptr) hold->next = make_shared<Simulation::TerminateBlock>(*sim);
+    auto block = make_unique<Simulation::TerminateBlock>(*sim);
+
+    if (hold != nullptr) hold->next = block.get();
     hold = nullptr;
+
+    sim->blocks.emplace_back(move(block));
 
     return *this;
 }
 
+
 LogicNode::func_t SimBuilder::is_q_empty(const string& label) {
     size_t index = q_map[label];
-    return [this, index](){ return sim->is_q_empty(index); };
+    Simulation* sim_ptr = sim.get();
+    return [sim_ptr, index](){ return sim_ptr->is_q_empty(index); };
 }
 
 LogicNode::func_t SimBuilder::is_storage_empty(const string& label) {
     size_t index = storage_map[label];
-    return [this, index](){ return sim->is_storage_empty(index); };
+    Simulation* sim_ptr = sim.get();
+    return [sim_ptr, index](){ return sim_ptr->is_storage_empty(index); };
 }
 
 LogicNode::func_t SimBuilder::is_storage_avail(const string& label) {
     size_t index = storage_map[label];
-    return [this, index](){ return sim->is_storage_avail(index); };
+    Simulation* sim_ptr = sim.get();
+    return [sim_ptr, index](){ return sim_ptr->is_storage_avail(index); };
 }
 LogicNode::func_t SimBuilder::is_storage_full(const string& label) {
     size_t index = storage_map[label];
-    return [this, index](){ return sim->is_storage_full(index); };
+    Simulation* sim_ptr = sim.get();
+    return [sim_ptr, index](){ return sim_ptr->is_storage_full(index); };
 }
 
-shared_ptr<Simulation> SimBuilder::build() {
+unique_ptr<Simulation> SimBuilder::build() {
     if (hold != nullptr) cerr << "Warning: transactions may fall out of bounds\n";
     for (auto& el : sim->labels) if (el.data == nullptr) throw SimBuilderException(format("Usage of undefined label \"{}\"", el.name));
     sim->q_stat.resize(sim->queues.size());
     sim->storage_stat.resize(sim->queues.size());
 
-    return sim;
+    return move(sim);
 }
 

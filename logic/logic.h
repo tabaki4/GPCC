@@ -25,6 +25,7 @@ public:
     LogicNode(func_t func); // EVAL
     LogicNode(); // deafult
     LogicNode(LogicNode&& rhs); // move unique_ptr
+    LogicNode(const LogicNode& rhs) = delete; // TODO: implement deep copy;
     
     LogicNode& operator=(LogicNode&& rhs); // move unique_ptr
 

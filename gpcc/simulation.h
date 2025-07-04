@@ -31,15 +31,18 @@ private:
         string name;
         T data;
 
-        NamedVar(const string& name, T& data): name(name), data(data) {}
-        NamedVar(const string& name, T&& data): name(name), data(data) {}
+        template <typename U>
+        NamedVar(const string& name, U&& data): name(name), data(forward<U>(data)) {}
     };
+    // small deduction guide hack
+    template <typename U>
+    NamedVar(const string&, U&&) -> NamedVar<decay_t<U>>;
 
     struct SpawnData {
         priority_t pr;
-        shared_ptr<Block> block;
+        Block* block;
 
-        SpawnData(priority_t pr, shared_ptr<Block> block);
+        SpawnData(priority_t pr, Block* block);
         bool operator<(const SpawnData& rhs) const;
     };
 
@@ -48,7 +51,7 @@ private:
         double time;
 
         TimedSpawn(SpawnData& data, double time);
-        TimedSpawn(priority_t pr, shared_ptr<Block> block, double time);
+        TimedSpawn(priority_t pr, Block* block, double time);
         bool operator<(const TimedSpawn& rhs) const;
     };
 
@@ -68,10 +71,11 @@ private:
 
     double g_time = 0;
     double end_time;
-    vector<NamedVar<shared_ptr<Block>>> labels;
+    vector<unique_ptr<Block>> blocks;
+    vector<NamedVar<Block*>> labels;
     vector<NamedVar<size_t>> queues;
-    vector<NamedVar<shared_ptr<Storage>>> storages;
-    vector<shared_ptr<GateBlock>> gates;
+    vector<NamedVar<unique_ptr<Storage>>> storages;
+    vector<GateBlock*> gates;
     priority_queue<TimedSpawn> spawn_schedule;
     queue<SpawnData> priority_spawn_schedule;
 
@@ -97,7 +101,7 @@ public:
 
     void launch();
 
-    Simulation(Simulation&) = delete;
+    Simulation(Simulation&) = delete; // TODO: implement deep copy and move semantics for sim
     Simulation();
     ~Simulation();
 };

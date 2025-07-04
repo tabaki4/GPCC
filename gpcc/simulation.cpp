@@ -2,11 +2,11 @@
 #include <iostream>
 #include <iomanip>
 
-Simulation::SpawnData::SpawnData(priority_t pr, shared_ptr<Block> block): pr(pr), block(block) {}
+Simulation::SpawnData::SpawnData(priority_t pr, Block* block): pr(pr), block(block) {}
 bool Simulation::SpawnData::operator<(const SpawnData& rhs) const { return pr < rhs.pr; }
 
 Simulation::TimedSpawn::TimedSpawn(SpawnData& data, double time): data(data), time(time) {}
-Simulation::TimedSpawn::TimedSpawn(priority_t pr, shared_ptr<Block> block, double time): data(pr, block), time(time) {}
+Simulation::TimedSpawn::TimedSpawn(priority_t pr, Block* block, double time): data(pr, block), time(time) {}
 bool Simulation::TimedSpawn::operator<(const TimedSpawn& rhs) const { return time > rhs.time; }
 
 
@@ -16,7 +16,7 @@ bool Simulation::is_storage_avail(size_t index) { return storages[index].data->a
 bool Simulation::is_storage_full(size_t index) { return storages[index].data->full(); }
 
 void Simulation::serve(SpawnData& data) {
-    shared_ptr<Block> current = data.block;
+    Block* current = data.block;
     while (current != nullptr) { 
             
         #ifndef NDEBUG
@@ -117,4 +117,4 @@ void Simulation::launch() {
     }
     finalize_stat();
     report();
-}   
+} 
