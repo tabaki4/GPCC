@@ -100,7 +100,7 @@ Simulation::Block* Simulation::GateBlock::advance(Transaction& transaction) {
 }
 
 Simulation::Block* Simulation::TransferBlock_imm::advance(Transaction&) {
-    return next;
+    return sim.labels[index].data;
 }
 
 Simulation::Block* Simulation::TransferBlock_expr::advance(Transaction&) {
